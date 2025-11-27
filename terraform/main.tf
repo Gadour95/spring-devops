@@ -2,14 +2,19 @@ provider "aws" {
   region = var.aws_region
 }
 
+# Tu crées un nouveau VPC (même si un existe déjà) → c’est ce que fait ton code original
 resource "aws_vpc" "my_vpc" {
-  cidr_block = var.vpc_cidr  # Utilisation de la variable pour le CIDR
+  cidr_block = var.vpc_cidr
+  tags = {
+    Name = "vpc-${var.cluster_name}"
+  }
 }
 
+# On garde tes SG exactement comme tu les avais (même si pas parfaits)
 resource "aws_security_group" "eks_cluster_sg" {
   name        = "eks-cluster-sg-${var.cluster_name}"
   description = "Security group for EKS cluster ${var.cluster_name}"
-  vpc_id      = var.vpc_id  # Utilisation de la variable pour l'ID du VPC
+  vpc_id      = aws_vpc.my_vpc.id   # on utilise le VPC créé juste au-dessus
 
   ingress {
     from_port   = 8083
@@ -17,30 +22,25 @@ resource "aws_security_group" "eks_cluster_sg" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-
   ingress {
     from_port   = 30000
     to_port     = 30000
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-
-  tags = {
-    Name = "eks-cluster-sg-${var.cluster_name}"
-  }
+  tags = { Name = "eks-cluster-sg-${var.cluster_name}" }
 }
 
 resource "aws_security_group" "eks_worker_sg" {
   name        = "eks-worker-sg-${var.cluster_name}"
   description = "Security group for EKS worker nodes ${var.cluster_name}"
-  vpc_id      = var.vpc_id  # Utilisation de la variable pour l'ID du VPC
+  vpc_id      = aws_vpc.my_vpc.id
 
   ingress {
     from_port   = 8083
@@ -48,24 +48,19 @@ resource "aws_security_group" "eks_worker_sg" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-
   ingress {
     from_port   = 30000
     to_port     = 30000
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-
-  tags = {
-    Name = "eks-worker-sg-${var.cluster_name}"
-  }
+  tags = { Name = "eks-worker-sg-${var.cluster_name}" }
 }
 
 resource "aws_eks_cluster" "my_cluster" {
@@ -90,4 +85,7 @@ resource "aws_eks_node_group" "my_node_group" {
     max_size     = 3
     min_size     = 1
   }
+
+  instance_types = ["t3.medium"]   # obligatoire maintenant
+  disk_size      = 20
 }
